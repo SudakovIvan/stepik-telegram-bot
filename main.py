@@ -17,11 +17,11 @@ def echo(message):
         bot.reply_to(message, "Привет, " + message.from_user.first_name)
     elif message.text == "Дай вопрос":
         global question_counter
-        question_counter += 1
         original_reply = str(requests.get("https://engine.lifeis.porn/api/millionaire.php?q=2").json())
         # что за непонятные символы? Это потому, что бесплатно?
         corrected_reply = original_reply.replace(u"\\u2063","")
         bot.reply_to(message, corrected_reply)
+        question_counter += 1
     elif message.text == "Сколько вопросов":
         bot.reply_to(message, "Вопросов выдано: {}".format(question_counter))
     else:
