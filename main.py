@@ -6,26 +6,37 @@ token = "1338383686:AAHTzCQAg345W3nCl6GTy7n8mWN4IwLdxUE"
 
 bot = telebot.TeleBot(token)
 
-question_counter = 0
+states = {}
+MAIN_STATE = "main"
+GAME_STATE = "game"
+SETTINGS_STATE = "settings"
 
 
-@bot.message_handler(func=lambda message: True)
-def echo(message):
-    if message.text == "/start":
-        bot.reply_to(message, "Напиши 'Дай вопрос' или 'Сколько вопросов'")
-    elif message.text == "Привет":
-        bot.reply_to(message, "Привет, " + message.from_user.first_name)
-    elif message.text == "Дай вопрос":
-        global question_counter
+@bot.message_handler(func=lambda message: states.get(message.from_user.id, MAIN_STATE) == MAIN_STATE)
+def main_handler(message):
+    text = message.text.lower()
+    if text == "/start" or text == "привет":
+        bot.reply_to(message, "Привет, {0}! Напиши 'играть' или 'настройки'".format(message.from_user.first_name))
+    elif text == "играть":
         original_reply = str(requests.get("https://engine.lifeis.porn/api/millionaire.php?q=2").json())
         # что за непонятные символы? Это потому, что бесплатно?
-        corrected_reply = original_reply.replace(u"\\u2063","")
+        corrected_reply = original_reply.replace(u"\\u2063", "")
         bot.reply_to(message, corrected_reply)
-        question_counter += 1
-    elif message.text == "Сколько вопросов":
-        bot.reply_to(message, "Вопросов выдано: {}".format(question_counter))
+        states[message.from_user.id] = GAME_STATE
+    elif text == "настройки":
+        states[message.from_user.id] = SETTINGS_STATE
     else:
-        bot.reply_to(message, "Я не знаю таких слов: '" + message.text + "'")
+        bot.reply_to(message, "Я не понимаю таких слов: '" + message.text + "'")
+
+
+@bot.message_handler(func=lambda message: states.get(message.from_user.id, MAIN_STATE) == GAME_STATE)
+def game_handler(message):
+    bot.reply_to(message, "в игре")
+
+
+@bot.message_handler(func=lambda message: states.get(message.from_user.id, MAIN_STATE) == SETTINGS_STATE)
+def game_handler(message):
+    bot.reply_to(message, "в настройках")
 
 
 def main():
