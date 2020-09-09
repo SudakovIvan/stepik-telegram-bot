@@ -23,7 +23,7 @@ def initialize_game():
         questions.append(question_description["question"])
 
 
-def sendNextQuestion(user_id):
+def send_next_question(user_id):
     global question_counter
     text = "Вопрос {0}:\n{1}".format(question_counter, questions.pop())
     bot.send_message(user_id, text)
@@ -41,7 +41,7 @@ def main_handler(message):
             bot.reply_to(message, "Не удалось получить ни одного вопроса")
         else:
             bot.reply_to(message, "Это беспроигрышная пока игра. Можно отвечать что угодно:)")
-            sendNextQuestion(message.from_user.id)
+            send_next_question(message.from_user.id)
             states[message.from_user.id] = GAME_STATE
     elif text == "настройки":
         states[message.from_user.id] = SETTINGS_STATE
@@ -57,7 +57,7 @@ def game_handler(message):
         bot.send_message(user_id, "Игра закончена!")
         states[user_id] = MAIN_STATE
     else:
-        sendNextQuestion(user_id)
+        send_next_question(user_id)
 
 
 @bot.message_handler(func=lambda message: states.get(message.from_user.id, MAIN_STATE) == SETTINGS_STATE)
