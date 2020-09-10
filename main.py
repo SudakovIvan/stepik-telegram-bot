@@ -26,6 +26,9 @@ settings = {}
 def initialize_game(user_id):
     current_settings = get_current_settings(user_id)
 
+    # Функция уходит в бесконечный цикл, если запросить вопросов больше, чем есть
+    # ошибка внутри библиотеки
+    # есть другая библиотека, можно попробовать ее
     api_reply = trivia_api.request(current_settings["question_count"],
                                    current_settings["category"],
                                    current_settings["difficulty"],
