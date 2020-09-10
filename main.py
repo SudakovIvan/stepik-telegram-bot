@@ -61,6 +61,7 @@ def main_handler(message):
     if text == "/start" or text == "привет":
         bot.reply_to(message, "Привет, {0}! Напиши 'играть' или 'настройки'".format(message.from_user.first_name))
     elif text == "играть":
+        bot.send_chat_action(user_id,"typing")
         initialize_game(user_id)
         if not questions[user_id]:
             bot.reply_to(message, "Не удалось получить ни одного вопроса")
