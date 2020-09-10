@@ -1,6 +1,7 @@
 import telebot
 import collections
 import pytrivia
+import random
 
 token = "1338383686:AAHTzCQAg345W3nCl6GTy7n8mWN4IwLdxUE"
 # https://api.telegram.org/bot1338383686:AAHTzCQAg345W3nCl6GTy7n8mWN4IwLdxUE/sendmessage?chat_id=943519774&text=hi
@@ -75,6 +76,7 @@ def main_handler(message):
             send_next_question(user_id)
             states[user_id] = GAME_STATE
     elif text == "настройки":
+        get_current_settings(user_id)["category"] = random.choice(list(pytrivia.Category))
         bot.reply_to(message, "Введи количество вопросов (1-50)")
         states[user_id] = SET_QUESTION_COUNT_STATE
     else:
