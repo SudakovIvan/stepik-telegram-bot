@@ -27,7 +27,7 @@ settings = {}
 class QuestionsAPIError(Exception):
     def __init__(self, description):
         self._description = "Произошла ошибка при формировании списка вопросов: {}".format(description)
-        if not description:
+        if not description.strip():
             self._description += "неизвестная ошибка"
 
     def __str__(self):
