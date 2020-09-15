@@ -24,6 +24,16 @@ questions = {}
 settings = {}
 
 
+class QuestionsAPIError(Exception):
+    def __init__(self, description):
+        self._description = "Произошла ошибка при формировании списка вопросов: {}".format(description)
+        if not description:
+            self._description += "неизвестная ошибка"
+
+    def __str__(self):
+        return self._description
+
+
 def initialize_game(user_id):
     current_settings = get_current_settings(user_id)
 
@@ -31,16 +41,24 @@ def initialize_game(user_id):
     # ошибка в самом api - по документации в этом случае должен быть код возврата 1, а он - 4
     # так как мы инициализируем игру каждый раз, то повторяющихся вопросов быть не должно, и токен можно не использовать
     # без токена работает ожидаемо
-    api_reply = trivia_api.request(current_settings["question_count"],
-                                   current_settings["category"],
-                                   current_settings["difficulty"],
-                                   pytrivia.Type.Multiple_Choice)
+    try:
+        api_reply = trivia_api.request(current_settings["question_count"],
+                                       current_settings["category"],
+                                       current_settings["difficulty"],
+                                       pytrivia.Type.Multiple_Choice)
+    except ValueError:
+        raise QuestionsAPIError("Число вопросов должно быть в интервале [1,50], а оно равно {}".format(current_settings["question_count"]))
+    except Exception as error:
+        raise QuestionsAPIError(str(error))
 
     questions[user_id] = collections.deque()
     counter = 1
     for question_description in api_reply["results"]:
         questions[user_id].append("Вопрос {0}:\n {1}".format(counter, question_description["question"]))
         counter += 1
+
+    if not questions[user_id]:
+        raise QuestionsAPIError("не удалось получить ни одного вопроса. Попробуйте уменьшить число вопросов в настройках")
 
 
 def send_next_question(user_id):
@@ -62,21 +80,23 @@ def main_handler(message):
     if text == "/start" or text == "привет":
         bot.reply_to(message, "Привет, {0}! Напиши 'играть' или 'настройки'".format(message.from_user.first_name))
     elif text == "играть":
-        bot.send_chat_action(user_id,"typing")
-        initialize_game(user_id)
-        if not questions[user_id]:
-            bot.reply_to(message, "Не удалось получить ни одного вопроса")
-        else:
-            current_settings = get_current_settings(user_id)
-            start_game_message = "Это беспроигрышная пока игра. Можно отвечать что угодно:)\n" \
-                                 "Количество вопросов: {0}\n" \
-                                 "Сложность: {1}\n" \
-                                 "Категория: {2}".format(current_settings["question_count"],
-                                                         current_settings["difficulty"], current_settings["category"])
+        bot.send_chat_action(user_id, "typing")
+        try:
+            initialize_game(user_id)
+        except QuestionsAPIError as error:
+            bot.reply_to(message, str(error))
+            return
 
-            bot.reply_to(message, start_game_message)
-            send_next_question(user_id)
-            states[user_id] = GAME_STATE
+        current_settings = get_current_settings(user_id)
+        start_game_message = "Это беспроигрышная пока игра. Можно отвечать что угодно:)\n" \
+                             "Количество вопросов: {0}\n" \
+                             "Сложность: {1}\n" \
+                             "Категория: {2}".format(current_settings["question_count"],
+                                                     current_settings["difficulty"], current_settings["category"])
+
+        bot.reply_to(message, start_game_message)
+        send_next_question(user_id)
+        states[user_id] = GAME_STATE
     elif text == "настройки":
         get_current_settings(user_id)["category"] = random.choice(list(pytrivia.Category))
         bot.reply_to(message, "Введи количество вопросов (1-50)")
