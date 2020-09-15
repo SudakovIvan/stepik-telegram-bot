@@ -7,7 +7,7 @@ token = "1338383686:AAHTzCQAg345W3nCl6GTy7n8mWN4IwLdxUE"
 # https://api.telegram.org/bot1338383686:AAHTzCQAg345W3nCl6GTy7n8mWN4IwLdxUE/sendmessage?chat_id=943519774&text=hi
 
 bot = telebot.TeleBot(token)
-trivia_api = pytrivia.Trivia(with_token=True)
+trivia_api = pytrivia.Trivia(with_token=False)
 
 MAIN_STATE = "main_state"
 GAME_STATE = "game_state"
@@ -27,9 +27,10 @@ settings = {}
 def initialize_game(user_id):
     current_settings = get_current_settings(user_id)
 
-    # Функция уходит в бесконечный цикл, если запросить вопросов больше, чем есть
-    # ошибка внутри библиотеки
-    # есть другая библиотека, можно попробовать ее
+    # Функция уходит в бесконечный цикл, если запросить вопросов больше, чем есть в данной категории при использовании токена
+    # ошибка в самом api - по документации в этом случае должен быть код возврата 1, а он - 4
+    # так как мы инициализируем игру каждый раз, то повторяющихся вопросов быть не должно, и токен можно не использовать
+    # без токена работает ожидаемо
     api_reply = trivia_api.request(current_settings["question_count"],
                                    current_settings["category"],
                                    current_settings["difficulty"],
