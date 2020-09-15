@@ -68,8 +68,7 @@ def send_next_question(user_id):
 
 def get_current_settings(user_id):
     if user_id not in settings:
-        # тут же  я правильно скопировал это дело? Иначе будет один объект для всех пользователей?
-        settings[user_id] = dict(DEFAULT_SETTINGS)
+        settings[user_id] = DEFAULT_SETTINGS.copy()
     return settings[user_id]
 
 
