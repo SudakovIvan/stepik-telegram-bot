@@ -22,6 +22,7 @@ DEFAULT_SETTINGS = {"question_count": 3,
 states = {}
 questions = {}
 settings = {}
+current_correct_answer ={}
 
 
 class QuestionsAPIError(Exception):
@@ -55,7 +56,11 @@ def initialize_game(user_id):
     questions[user_id] = collections.deque()
     counter = 1
     for question_description in api_reply["results"]:
-        questions[user_id].append("Вопрос {0}:\n {1}".format(counter, question_description["question"]))
+        question_with_answers = dict()
+        question_with_answers["question"] = "Вопрос {0}:\n {1}".format(counter, question_description["question"])
+        question_with_answers["correct_answer"] = question_description["correct_answer"]
+        question_with_answers["incorrect_answers"] = question_description["incorrect_answers"]
+        questions[user_id].append(question_with_answers)
         counter += 1
 
     if not questions[user_id]:
@@ -64,8 +69,10 @@ def initialize_game(user_id):
 
 
 def send_next_question(user_id):
-    text = questions[user_id].popleft()
-    bot.send_message(user_id, text)
+    question_with_answers = questions[user_id].popleft()
+    bot.send_message(user_id, question_with_answers["question"],
+                     reply_markup=gen_answers_markup(question_with_answers["correct_answer"], question_with_answers["incorrect_answers"]))
+    current_correct_answer[user_id] = question_with_answers["correct_answer"]
 
 
 def get_current_settings(user_id):
@@ -88,6 +95,19 @@ def gen_difficulty_markup():
     markup.add(telebot.types.InlineKeyboardButton("Легко", callback_data="easy"),
                telebot.types.InlineKeyboardButton("Средне", callback_data="medium"),
                telebot.types.InlineKeyboardButton("Сложно", callback_data="hard"))
+    return markup
+
+
+def gen_answers_markup(correct_answer, incorrect_answers):
+    markup = telebot.types.InlineKeyboardMarkup()
+    markup.row_width = 2
+    buttons = list()
+    buttons.append(telebot.types.InlineKeyboardButton(correct_answer, callback_data="correct"))
+
+    for incorrect_answer in incorrect_answers:
+        buttons.append(telebot.types.InlineKeyboardButton(incorrect_answer, callback_data="incorrect"))
+
+    markup.add(*buttons)
     return markup
 
 
@@ -133,12 +153,28 @@ def main_menu_handler(call):
 @bot.message_handler(func=lambda message: states.get(message.from_user.id, MAIN_STATE) == GAME_STATE)
 def game_handler(message):
     user_id = message.from_user.id
-    bot.reply_to(message, "Верно!")
+    bot.reply_to(message, "Игра прервана! Возвращаемся в главное меню", reply_markup=gen_main_menu_markup())
+    states[user_id] = MAIN_STATE
+
+
+@bot.callback_query_handler(func=lambda call: states.get(call.from_user.id, MAIN_STATE) == GAME_STATE)
+def game_handler(call):
+    user_id = call.from_user.id
+    data = call.data
+    if data == "correct":
+        bot.send_message(user_id, "Верно!")
+    elif data == "incorrect":
+        bot.send_message(user_id, "Неверно! Правильный ответ: {}".format(current_correct_answer[user_id]))
+    else:
+        assert False, "Invalid call.data {}".format(data)
+
     if not questions[user_id]:
         bot.send_message(user_id, "Игра закончена!", reply_markup=gen_main_menu_markup())
         states[user_id] = MAIN_STATE
     else:
         send_next_question(user_id)
+
+    bot.answer_callback_query(call.id)
 
 
 @bot.message_handler(func=lambda message: states.get(message.from_user.id, MAIN_STATE) == SET_QUESTION_COUNT_STATE)
