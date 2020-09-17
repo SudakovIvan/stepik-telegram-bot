@@ -22,7 +22,7 @@ DEFAULT_SETTINGS = {"question_count": 3,
 states = {}
 questions = {}
 settings = {}
-current_correct_answer ={}
+current_correct_answer = {}
 
 
 class QuestionsAPIError(Exception):
@@ -107,6 +107,7 @@ def gen_answers_markup(correct_answer, incorrect_answers):
     for incorrect_answer in incorrect_answers:
         buttons.append(telebot.types.InlineKeyboardButton(incorrect_answer, callback_data="incorrect"))
 
+    random.shuffle(buttons)
     markup.add(*buttons)
     return markup
 
@@ -132,7 +133,7 @@ def main_menu_handler(call):
             bot.send_message(user_id, str(error), reply_markup=gen_main_menu_markup())
         else:
             current_settings = get_current_settings(user_id)
-            start_game_message = "Это беспроигрышная пока игра. Можно отвечать что угодно:)\n" \
+            start_game_message = "Начинаем!\n" \
                                  "Количество вопросов: {0}\n" \
                                  "Сложность: {1}\n" \
                                  "Категория: {2}".format(current_settings["question_count"],
@@ -144,7 +145,7 @@ def main_menu_handler(call):
 
     elif call.data == "settings":
         get_current_settings(user_id)["category"] = random.choice(list(pytrivia.Category))
-        bot.send_message(user_id, "Введи количество вопросов (1-50)")
+        bot.send_message(user_id, "Введите количество вопросов (1-50)")
         states[user_id] = SET_QUESTION_COUNT_STATE
 
     bot.answer_callback_query(call.id)
