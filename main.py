@@ -47,7 +47,8 @@ def initialize_game(user_id):
                                        current_settings["difficulty"],
                                        pytrivia.Type.Multiple_Choice)
     except ValueError:
-        raise QuestionsAPIError("Число вопросов должно быть в интервале [1,50], а оно равно {}".format(current_settings["question_count"]))
+        raise QuestionsAPIError(
+            "Число вопросов должно быть в интервале [1,50], а оно равно {}".format(current_settings["question_count"]))
     except Exception as error:
         raise QuestionsAPIError(str(error))
 
@@ -58,7 +59,8 @@ def initialize_game(user_id):
         counter += 1
 
     if not questions[user_id]:
-        raise QuestionsAPIError("не удалось получить ни одного вопроса. Попробуйте уменьшить число вопросов в настройках")
+        raise QuestionsAPIError(
+            "не удалось получить ни одного вопроса. Попробуйте уменьшить число вопросов в настройках")
 
 
 def send_next_question(user_id):
@@ -72,18 +74,33 @@ def get_current_settings(user_id):
     return settings[user_id]
 
 
+def gen_main_menu_markup():
+    markup = telebot.types.InlineKeyboardMarkup()
+    markup.row_width = 2
+    markup.add(telebot.types.InlineKeyboardButton("Играть", callback_data="play"),
+               telebot.types.InlineKeyboardButton("Настройки", callback_data="settings"))
+    return markup
+
+
 @bot.message_handler(func=lambda message: states.get(message.from_user.id, MAIN_STATE) == MAIN_STATE)
 def main_handler(message):
     text = message.text.lower()
-    user_id = message.from_user.id
     if text == "/start" or text == "привет":
-        bot.reply_to(message, "Привет, {0}! Напиши 'играть' или 'настройки'".format(message.from_user.first_name))
-    elif text == "играть":
+        bot.reply_to(message, "Привет, {0}! Меню:".format(message.from_user.first_name),
+                     reply_markup=gen_main_menu_markup())
+    else:
+        bot.reply_to(message, "Я вас не понял: '" + message.text + "'", reply_markup=gen_main_menu_markup())
+
+
+@bot.callback_query_handler(func=lambda call: states.get(call.from_user.id, MAIN_STATE) == MAIN_STATE)
+def main_menu_handler(call):
+    user_id = call.from_user.id
+    if call.data == "play":
         bot.send_chat_action(user_id, "typing")
         try:
             initialize_game(user_id)
         except QuestionsAPIError as error:
-            bot.reply_to(message, str(error))
+            bot.send_message(user_id, str(error))
             return
 
         current_settings = get_current_settings(user_id)
@@ -93,15 +110,15 @@ def main_handler(message):
                              "Категория: {2}".format(current_settings["question_count"],
                                                      current_settings["difficulty"], current_settings["category"])
 
-        bot.reply_to(message, start_game_message)
+        bot.send_message(user_id, start_game_message)
         send_next_question(user_id)
         states[user_id] = GAME_STATE
-    elif text == "настройки":
+        bot.answer_callback_query(call.id)
+    elif call.data == "settings":
         get_current_settings(user_id)["category"] = random.choice(list(pytrivia.Category))
-        bot.reply_to(message, "Введи количество вопросов (1-50)")
+        bot.send_message(user_id, "Введи количество вопросов (1-50)")
         states[user_id] = SET_QUESTION_COUNT_STATE
-    else:
-        bot.reply_to(message, "Я не понимаю таких слов: '" + message.text + "'")
+        bot.answer_callback_query(call.id)
 
 
 @bot.message_handler(func=lambda message: states.get(message.from_user.id, MAIN_STATE) == GAME_STATE)
@@ -109,7 +126,7 @@ def game_handler(message):
     user_id = message.from_user.id
     bot.reply_to(message, "Верно!")
     if not questions[user_id]:
-        bot.send_message(user_id, "Игра закончена!")
+        bot.send_message(user_id, "Игра закончена!",reply_markup=gen_main_menu_markup())
         states[user_id] = MAIN_STATE
     else:
         send_next_question(user_id)
