@@ -13,6 +13,7 @@ MAIN_STATE = "main_state"
 GAME_STATE = "game_state"
 SET_QUESTION_COUNT_STATE = "question_count_state"
 SET_DIFFICULTY_STATE = "difficulty_state"
+SET_CATEGORY_STATE = "category_state"
 
 DEFAULT_SETTINGS = {"question_count": 3,
                     "difficulty": pytrivia.Diffculty.Easy,
@@ -71,7 +72,8 @@ def initialize_game(user_id):
 def send_next_question(user_id):
     question_with_answers = questions[user_id].popleft()
     bot.send_message(user_id, question_with_answers["question"],
-                     reply_markup=gen_answers_markup(question_with_answers["correct_answer"], question_with_answers["incorrect_answers"]))
+                     reply_markup=gen_answers_markup(question_with_answers["correct_answer"],
+                                                     question_with_answers["incorrect_answers"]))
     current_correct_answer[user_id] = question_with_answers["correct_answer"]
 
 
@@ -95,6 +97,18 @@ def gen_difficulty_markup():
     markup.add(telebot.types.InlineKeyboardButton("Легко", callback_data="easy"),
                telebot.types.InlineKeyboardButton("Средне", callback_data="medium"),
                telebot.types.InlineKeyboardButton("Сложно", callback_data="hard"))
+    return markup
+
+
+def gen_category_markup():
+    markup = telebot.types.InlineKeyboardMarkup()
+    markup.row_width = 3
+
+    buttons = []
+    for category in list(pytrivia.Category):
+        buttons.append(telebot.types.InlineKeyboardButton(category.name, callback_data=category.value))
+
+    markup.add(*buttons)
     return markup
 
 
@@ -144,7 +158,6 @@ def main_menu_handler(call):
             states[user_id] = GAME_STATE
 
     elif call.data == "settings":
-        get_current_settings(user_id)["category"] = random.choice(list(pytrivia.Category))
         bot.send_message(user_id, "Введите количество вопросов (1-50)")
         states[user_id] = SET_QUESTION_COUNT_STATE
 
@@ -208,8 +221,9 @@ def set_difficulty_handler(call):
     else:
         assert False, "Invalid call.data={}".format(data)
 
-    bot.send_message(user_id, "Настройки приняты", reply_markup=gen_main_menu_markup())
-    states[user_id] = MAIN_STATE
+    bot.send_message(user_id, "Выберем категорию",
+                     reply_markup=gen_category_markup())
+    states[user_id] = SET_CATEGORY_STATE
     bot.answer_callback_query(call.id)
 
 
@@ -217,6 +231,24 @@ def set_difficulty_handler(call):
 def set_question_count_handler(message):
     bot.reply_to(message, "Я вас не понял: '" + message.text + "'. " + "Выберем сложность игры:",
                  reply_markup=gen_difficulty_markup())
+
+
+@bot.callback_query_handler(func=lambda call: states.get(call.from_user.id, MAIN_STATE) == SET_CATEGORY_STATE)
+def set_category_handler(call):
+    user_id = call.from_user.id
+    current_settings = get_current_settings(user_id)
+    data = call.data
+    category = pytrivia.Category(int(data))
+    current_settings["category"] = category
+    bot.send_message(user_id, "Настройки приняты", reply_markup=gen_main_menu_markup())
+    states[user_id] = MAIN_STATE
+    bot.answer_callback_query(call.id)
+
+
+@bot.message_handler(func=lambda message: states.get(message.from_user.id, MAIN_STATE) == SET_CATEGORY_STATE)
+def set_question_count_handler(message):
+    bot.reply_to(message, "Я вас не понял: '" + message.text + "'. " + "Выберем категорию:",
+                 reply_markup=gen_category_markup())
 
 
 def main():
