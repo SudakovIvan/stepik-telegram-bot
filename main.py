@@ -272,7 +272,7 @@ def set_question_count_handler(message):
 
 
 def main():
-    bot.polling()
+    bot.polling(none_stop=True)
 
 
 if __name__ == '__main__':
