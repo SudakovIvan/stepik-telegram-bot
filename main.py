@@ -82,6 +82,15 @@ def gen_main_menu_markup():
     return markup
 
 
+def gen_difficulty_markup():
+    markup = telebot.types.InlineKeyboardMarkup()
+    markup.row_width = 1
+    markup.add(telebot.types.InlineKeyboardButton("Легко", callback_data="easy"),
+               telebot.types.InlineKeyboardButton("Средне", callback_data="medium"),
+               telebot.types.InlineKeyboardButton("Сложно", callback_data="hard"))
+    return markup
+
+
 @bot.message_handler(func=lambda message: states.get(message.from_user.id, MAIN_STATE) == MAIN_STATE)
 def main_handler(message):
     text = message.text.lower()
@@ -136,34 +145,41 @@ def game_handler(message):
 def set_question_count_handler(message):
     user_id = message.from_user.id
     current_settings = get_current_settings(user_id)
-    current_settings["question_count"] = int(message.text)
-    bot.reply_to(message, "Принял")
-    bot.send_message(user_id, "Выберем сложность вопросов ('легко', 'средне', 'сложно')")
-    states[user_id] = SET_DIFFICULTY_STATE
+    try:
+        current_settings["question_count"] = int(message.text)
+    except ValueError:
+        bot.reply_to(message, "Пожалуйста, введите целое число от 1 до 50 включительно")
+    else:
+        bot.reply_to(message, "Принял")
+        bot.send_message(user_id, "Выберем сложность вопросов",
+                         reply_markup=gen_difficulty_markup())
+        states[user_id] = SET_DIFFICULTY_STATE
+
+
+@bot.callback_query_handler(func=lambda call: states.get(call.from_user.id, MAIN_STATE) == SET_DIFFICULTY_STATE)
+def set_difficulty_handler(call):
+    user_id = call.from_user.id
+    current_settings = get_current_settings(user_id)
+    data = call.data
+
+    if data == "easy":
+        current_settings["difficulty"] = pytrivia.Diffculty.Easy
+    elif data == "medium":
+        current_settings["difficulty"] = pytrivia.Diffculty.Medium
+    elif data == "hard":
+        current_settings["difficulty"] = pytrivia.Diffculty.Hard
+    else:
+        assert False, "Invalid call.data={}".format(data)
+
+    bot.send_message(user_id, "Настройки приняты", reply_markup=gen_main_menu_markup())
+    states[user_id] = MAIN_STATE
+    bot.answer_callback_query(call.id)
 
 
 @bot.message_handler(func=lambda message: states.get(message.from_user.id, MAIN_STATE) == SET_DIFFICULTY_STATE)
-def set_difficulty_handler(message):
-    text = message.text.lower()
-    reply_text = "Принял"
-    new_state = MAIN_STATE
-    user_id = message.from_user.id
-    current_settings = get_current_settings(user_id)
-
-    if text == "легко":
-        current_settings["difficulty"] = pytrivia.Diffculty.Easy
-    elif text == "средне":
-        current_settings["difficulty"] = pytrivia.Diffculty.Medium
-    elif text == "сложно":
-        current_settings["difficulty"] = pytrivia.Diffculty.Hard
-    else:
-        reply_text = "Надо выбрать из трех вариантов: 'легко', 'средне', 'сложно'"
-        new_state = None
-
-    bot.reply_to(message, reply_text)
-
-    if new_state is not None:
-        states[user_id] = new_state
+def set_question_count_handler(message):
+    bot.reply_to(message, "Я вас не понял: '" + message.text + "'. " + "Выберем сложность игры:",
+                 reply_markup=gen_difficulty_markup())
 
 
 def main():
