@@ -2,6 +2,7 @@ import telebot
 import collections
 import pytrivia
 import random
+import datetime
 
 token = "1338383686:AAHTzCQAg345W3nCl6GTy7n8mWN4IwLdxUE"
 # https://api.telegram.org/bot1338383686:AAHTzCQAg345W3nCl6GTy7n8mWN4IwLdxUE/sendmessage?chat_id=943519774&text=hi
@@ -24,6 +25,7 @@ states = {}
 questions = {}
 settings = {}
 current_correct_answer = {}
+current_game_statistic = {}
 
 
 class QuestionsAPIError(Exception):
@@ -36,7 +38,21 @@ class QuestionsAPIError(Exception):
         return self._description
 
 
+def print_game_statistic(user_id, stat):
+    time_delta = datetime.datetime.now() - stat["time"]
+    stat_message = "Статистика игры:\n" \
+                   "Потраченное время: {0}\n" \
+                   "Результат: {1}/{2}\n".format(time_delta,
+                                                 stat["correct_answers_count"],
+                                                 stat["correct_answers_count"] + stat["incorrect_answers_count"])
+    bot.send_message(user_id, stat_message, reply_markup=gen_main_menu_markup())
+
+
 def initialize_game(user_id):
+    current_game_statistic[user_id] = dict()
+    current_game_statistic[user_id]["time"] = datetime.datetime.now()
+    current_game_statistic[user_id]["correct_answers_count"] = 0
+    current_game_statistic[user_id]["incorrect_answers_count"] = 0
     current_settings = get_current_settings(user_id)
 
     # Функция уходит в бесконечный цикл, если запросить вопросов больше, чем есть в данной категории при использовании токена
@@ -167,7 +183,8 @@ def main_menu_handler(call):
 @bot.message_handler(func=lambda message: states.get(message.from_user.id, MAIN_STATE) == GAME_STATE)
 def game_handler(message):
     user_id = message.from_user.id
-    bot.reply_to(message, "Игра прервана! Возвращаемся в главное меню", reply_markup=gen_main_menu_markup())
+    bot.reply_to(message, "Игра прервана! Возвращаемся в главное меню")
+    print_game_statistic(user_id, current_game_statistic[user_id])
     states[user_id] = MAIN_STATE
 
 
@@ -177,13 +194,16 @@ def game_handler(call):
     data = call.data
     if data == "correct":
         bot.send_message(user_id, "Верно!")
+        current_game_statistic[user_id]["correct_answers_count"] += 1
     elif data == "incorrect":
         bot.send_message(user_id, "Неверно! Правильный ответ: {}".format(current_correct_answer[user_id]))
+        current_game_statistic[user_id]["incorrect_answers_count"] += 1
     else:
         assert False, "Invalid call.data {}".format(data)
 
     if not questions[user_id]:
-        bot.send_message(user_id, "Игра закончена!", reply_markup=gen_main_menu_markup())
+        bot.send_message(user_id, "Игра закончена!")
+        print_game_statistic(user_id, current_game_statistic[user_id])
         states[user_id] = MAIN_STATE
     else:
         send_next_question(user_id)
