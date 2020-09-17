@@ -114,7 +114,7 @@ def gen_category_markup():
 
 def gen_answers_markup(correct_answer, incorrect_answers):
     markup = telebot.types.InlineKeyboardMarkup()
-    markup.row_width = 2
+    markup.row_width = 1
     buttons = list()
     buttons.append(telebot.types.InlineKeyboardButton(correct_answer, callback_data="correct"))
 
