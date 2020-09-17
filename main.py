@@ -100,25 +100,25 @@ def main_menu_handler(call):
         try:
             initialize_game(user_id)
         except QuestionsAPIError as error:
-            bot.send_message(user_id, str(error))
-            return
+            bot.send_message(user_id, str(error), reply_markup=gen_main_menu_markup())
+        else:
+            current_settings = get_current_settings(user_id)
+            start_game_message = "Это беспроигрышная пока игра. Можно отвечать что угодно:)\n" \
+                                 "Количество вопросов: {0}\n" \
+                                 "Сложность: {1}\n" \
+                                 "Категория: {2}".format(current_settings["question_count"],
+                                                         current_settings["difficulty"], current_settings["category"])
 
-        current_settings = get_current_settings(user_id)
-        start_game_message = "Это беспроигрышная пока игра. Можно отвечать что угодно:)\n" \
-                             "Количество вопросов: {0}\n" \
-                             "Сложность: {1}\n" \
-                             "Категория: {2}".format(current_settings["question_count"],
-                                                     current_settings["difficulty"], current_settings["category"])
+            bot.send_message(user_id, start_game_message)
+            send_next_question(user_id)
+            states[user_id] = GAME_STATE
 
-        bot.send_message(user_id, start_game_message)
-        send_next_question(user_id)
-        states[user_id] = GAME_STATE
-        bot.answer_callback_query(call.id)
     elif call.data == "settings":
         get_current_settings(user_id)["category"] = random.choice(list(pytrivia.Category))
         bot.send_message(user_id, "Введи количество вопросов (1-50)")
         states[user_id] = SET_QUESTION_COUNT_STATE
-        bot.answer_callback_query(call.id)
+
+    bot.answer_callback_query(call.id)
 
 
 @bot.message_handler(func=lambda message: states.get(message.from_user.id, MAIN_STATE) == GAME_STATE)
@@ -126,7 +126,7 @@ def game_handler(message):
     user_id = message.from_user.id
     bot.reply_to(message, "Верно!")
     if not questions[user_id]:
-        bot.send_message(user_id, "Игра закончена!",reply_markup=gen_main_menu_markup())
+        bot.send_message(user_id, "Игра закончена!", reply_markup=gen_main_menu_markup())
         states[user_id] = MAIN_STATE
     else:
         send_next_question(user_id)
