@@ -3,9 +3,9 @@ import collections
 import pytrivia
 import random
 import datetime
+import os
 
-token = "1338383686:AAHTzCQAg345W3nCl6GTy7n8mWN4IwLdxUE"
-# https://api.telegram.org/bot1338383686:AAHTzCQAg345W3nCl6GTy7n8mWN4IwLdxUE/sendmessage?chat_id=943519774&text=hi
+token = os.environ["TELEGRAM_TOKEN"]
 
 bot = telebot.TeleBot(token, num_threads=1)
 trivia_api = pytrivia.Trivia(with_token=False)
