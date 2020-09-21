@@ -167,7 +167,7 @@ def gen_answers_markup(correct_answer, incorrect_answers):
 def main_handler(message):
     text = message.text.lower()
     if text == "/start" or text == "привет":
-        bot.reply_to(message, "Привет, {0} {1}! Меню:".format(message.from_user.first_name, str(REDDIS_URL)),
+        bot.reply_to(message, "Привет, {0}! Меню:".format(message.from_user.first_name),
                      reply_markup=gen_main_menu_markup())
     else:
         bot.reply_to(message, "Я вас не понял: '" + message.text + "'", reply_markup=gen_main_menu_markup())
