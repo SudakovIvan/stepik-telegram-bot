@@ -4,6 +4,27 @@ import pytrivia
 import random
 import datetime
 import os
+import redis
+
+REDDIS_URL = os.environ.get("REDDIS_URL")
+
+dict_db = {}
+
+
+def save(key, value):
+    if REDDIS_URL:
+        redis_db = redis.from_url(REDDIS_URL)
+        redis_db.set(key, value)
+    else:
+        dict_db[key] = value
+
+
+def load(key):
+    if REDDIS_URL:
+        redis_db = redis.from_url(REDDIS_URL)
+        return redis_db.get(key)
+    return dict_db.get(key)
+
 
 token = os.environ["TELEGRAM_TOKEN"]
 
@@ -146,7 +167,7 @@ def gen_answers_markup(correct_answer, incorrect_answers):
 def main_handler(message):
     text = message.text.lower()
     if text == "/start" or text == "привет":
-        bot.reply_to(message, "Привет, {0}! Меню:".format(message.from_user.first_name),
+        bot.reply_to(message, "Привет, {0} {1}! Меню:".format(message.from_user.first_name, str(REDDIS_URL)),
                      reply_markup=gen_main_menu_markup())
     else:
         bot.reply_to(message, "Я вас не понял: '" + message.text + "'", reply_markup=gen_main_menu_markup())

@@ -9,6 +9,7 @@ verify_ssl = true
 requests = "*"
 pytelegrambotapi = "*"
 python-trivia-api = "*"
+redis = "*"
 
 [requires]
 python_version = "3.7"
