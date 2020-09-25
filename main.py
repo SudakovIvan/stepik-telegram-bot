@@ -153,7 +153,8 @@ def game_handler(call):
         bot.send_message(user_id, "Неверно! Правильный ответ: {}".format(current_correct_answer[user_id]))
         current_game_statistic[user_id]["incorrect_answers_count"] += 1
     else:
-        assert False, "Invalid call.data {}".format(data)
+        bot.answer_callback_query(call.id)
+        return None
 
     if not questions[user_id]:
         bot.send_message(user_id, "Игра закончена!")
@@ -191,7 +192,7 @@ def set_difficulty_handler(call):
 
 
 @bot.message_handler(func=lambda message: states.get(message.from_user.id, MAIN_STATE) == SET_DIFFICULTY_STATE)
-def set_question_count_handler(message):
+def difficulty_error_handler(message):
     bot.reply_to(message, "Я вас не понял: '" + message.text + "'. " + "Выберем сложность игры:",
                  reply_markup=keyboard_helpers.gen_difficulty_markup())
 
@@ -206,7 +207,7 @@ def set_category_handler(call):
 
 
 @bot.message_handler(func=lambda message: states.get(message.from_user.id, MAIN_STATE) == SET_CATEGORY_STATE)
-def set_question_count_handler(message):
+def category_error_handler(message):
     bot.reply_to(message, "Я вас не понял: '" + message.text + "'. " + "Выберем категорию:",
                  reply_markup=keyboard_helpers.gen_category_markup())
 
