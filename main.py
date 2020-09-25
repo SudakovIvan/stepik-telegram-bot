@@ -11,9 +11,9 @@ permanent_saver_type = os.environ.get("PERMANENT_SAVER_TYPE", None)
 permanent_saver = permanent.DefaultSaver()
 
 if permanent_saver_type == "json":
-    permanent_saver_type = permanent.SettingsToJsonSaver("dump")
+    permanent_saver = permanent.SettingsToJsonSaver("dump")
 
-settings_manager = permanent.SettingsManager(permanent_saver_type)
+settings_manager = permanent.SettingsManager(permanent_saver)
 
 token = os.environ["TELEGRAM_TOKEN"]
 
