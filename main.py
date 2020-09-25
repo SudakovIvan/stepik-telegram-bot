@@ -1,10 +1,10 @@
 import telebot
 import collections
 import pytrivia
-import random
 import datetime
 import os
 import permanent
+import keyboard_helpers
 
 permanent_saver_type = os.environ.get("PERMANENT_SAVER_TYPE", None)
 
@@ -49,7 +49,7 @@ def print_game_statistic(user_id, stat):
                    "Результат: {1}/{2}\n".format(time_delta,
                                                  stat["correct_answers_count"],
                                                  stat["correct_answers_count"] + stat["incorrect_answers_count"])
-    bot.send_message(user_id, stat_message, reply_markup=gen_main_menu_markup())
+    bot.send_message(user_id, stat_message, reply_markup=keyboard_helpers.gen_main_menu_markup())
 
 
 def initialize_game(user_id):
@@ -91,52 +91,9 @@ def initialize_game(user_id):
 def send_next_question(user_id):
     question_with_answers = questions[user_id].popleft()
     bot.send_message(user_id, question_with_answers["question"],
-                     reply_markup=gen_answers_markup(question_with_answers["correct_answer"],
+                     reply_markup=keyboard_helpers.gen_answers_markup(question_with_answers["correct_answer"],
                                                      question_with_answers["incorrect_answers"]))
     current_correct_answer[user_id] = question_with_answers["correct_answer"]
-
-
-def gen_main_menu_markup():
-    markup = telebot.types.InlineKeyboardMarkup()
-    markup.row_width = 2
-    markup.add(telebot.types.InlineKeyboardButton("Играть", callback_data="play"),
-               telebot.types.InlineKeyboardButton("Настройки", callback_data="settings"))
-    return markup
-
-
-def gen_difficulty_markup():
-    markup = telebot.types.InlineKeyboardMarkup()
-    markup.row_width = 1
-    markup.add(telebot.types.InlineKeyboardButton("Легко", callback_data="easy"),
-               telebot.types.InlineKeyboardButton("Средне", callback_data="medium"),
-               telebot.types.InlineKeyboardButton("Сложно", callback_data="hard"))
-    return markup
-
-
-def gen_category_markup():
-    markup = telebot.types.InlineKeyboardMarkup()
-    markup.row_width = 3
-
-    buttons = []
-    for category in list(pytrivia.Category):
-        buttons.append(telebot.types.InlineKeyboardButton(category.name, callback_data=category.value))
-
-    markup.add(*buttons)
-    return markup
-
-
-def gen_answers_markup(correct_answer, incorrect_answers):
-    markup = telebot.types.InlineKeyboardMarkup()
-    markup.row_width = 1
-    buttons = list()
-    buttons.append(telebot.types.InlineKeyboardButton(correct_answer, callback_data="correct"))
-
-    for incorrect_answer in incorrect_answers:
-        buttons.append(telebot.types.InlineKeyboardButton(incorrect_answer, callback_data="incorrect"))
-
-    random.shuffle(buttons)
-    markup.add(*buttons)
-    return markup
 
 
 @bot.message_handler(func=lambda message: states.get(message.from_user.id, MAIN_STATE) == MAIN_STATE)
@@ -144,9 +101,9 @@ def main_handler(message):
     text = message.text.lower()
     if text == "/start" or text == "привет":
         bot.reply_to(message, "Привет, {0}! Меню:".format(message.from_user.first_name),
-                     reply_markup=gen_main_menu_markup())
+                     reply_markup=keyboard_helpers.gen_main_menu_markup())
     else:
-        bot.reply_to(message, "Я вас не понял: '" + message.text + "'", reply_markup=gen_main_menu_markup())
+        bot.reply_to(message, "Я вас не понял: '" + message.text + "'", reply_markup=keyboard_helpers.gen_main_menu_markup())
 
 
 @bot.callback_query_handler(func=lambda call: states.get(call.from_user.id, MAIN_STATE) == MAIN_STATE)
@@ -157,7 +114,7 @@ def main_menu_handler(call):
         try:
             initialize_game(user_id)
         except QuestionsAPIError as error:
-            bot.send_message(user_id, str(error), reply_markup=gen_main_menu_markup())
+            bot.send_message(user_id, str(error), reply_markup=keyboard_helpers.gen_main_menu_markup())
         else:
             start_game_message = "Начинаем!\n" \
                                  "Количество вопросов: {0}\n" \
@@ -218,7 +175,7 @@ def set_question_count_handler(message):
     else:
         bot.reply_to(message, "Принял")
         bot.send_message(user_id, "Выберем сложность вопросов",
-                         reply_markup=gen_difficulty_markup())
+                         reply_markup=keyboard_helpers.gen_difficulty_markup())
         states[user_id] = SET_DIFFICULTY_STATE
 
 
@@ -228,7 +185,7 @@ def set_difficulty_handler(call):
     settings_manager.save_difficulty(user_id, call.data)
 
     bot.send_message(user_id, "Выберем категорию",
-                     reply_markup=gen_category_markup())
+                     reply_markup=keyboard_helpers.gen_category_markup())
     states[user_id] = SET_CATEGORY_STATE
     bot.answer_callback_query(call.id)
 
@@ -236,14 +193,14 @@ def set_difficulty_handler(call):
 @bot.message_handler(func=lambda message: states.get(message.from_user.id, MAIN_STATE) == SET_DIFFICULTY_STATE)
 def set_question_count_handler(message):
     bot.reply_to(message, "Я вас не понял: '" + message.text + "'. " + "Выберем сложность игры:",
-                 reply_markup=gen_difficulty_markup())
+                 reply_markup=keyboard_helpers.gen_difficulty_markup())
 
 
 @bot.callback_query_handler(func=lambda call: states.get(call.from_user.id, MAIN_STATE) == SET_CATEGORY_STATE)
 def set_category_handler(call):
     user_id = call.from_user.id
     settings_manager.save_category(user_id, call.data)
-    bot.send_message(user_id, "Настройки приняты", reply_markup=gen_main_menu_markup())
+    bot.send_message(user_id, "Настройки приняты", reply_markup=keyboard_helpers.gen_main_menu_markup())
     states[user_id] = MAIN_STATE
     bot.answer_callback_query(call.id)
 
@@ -251,7 +208,7 @@ def set_category_handler(call):
 @bot.message_handler(func=lambda message: states.get(message.from_user.id, MAIN_STATE) == SET_CATEGORY_STATE)
 def set_question_count_handler(message):
     bot.reply_to(message, "Я вас не понял: '" + message.text + "'. " + "Выберем категорию:",
-                 reply_markup=gen_category_markup())
+                 reply_markup=keyboard_helpers.gen_category_markup())
 
 
 def main():
