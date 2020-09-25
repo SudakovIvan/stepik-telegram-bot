@@ -4,27 +4,16 @@ import pytrivia
 import random
 import datetime
 import os
-import redis
+import permanent
 
-REDDIS_URL = os.environ.get("REDDIS_URL")
+permanent_saver_type = os.environ.get("PERMANENT_SAVER_TYPE", None)
 
-dict_db = {}
+permanent_saver = permanent.DefaultSaver()
 
+if permanent_saver_type == "json":
+    permanent_saver_type = permanent.SettingsToJsonSaver("dump")
 
-def save(key, value):
-    if REDDIS_URL:
-        redis_db = redis.from_url(REDDIS_URL)
-        redis_db.set(key, value)
-    else:
-        dict_db[key] = value
-
-
-def load(key):
-    if REDDIS_URL:
-        redis_db = redis.from_url(REDDIS_URL)
-        return redis_db.get(key)
-    return dict_db.get(key)
-
+settings_manager = permanent.SettingsManager(permanent_saver_type)
 
 token = os.environ["TELEGRAM_TOKEN"]
 
@@ -37,14 +26,8 @@ SET_QUESTION_COUNT_STATE = "question_count_state"
 SET_DIFFICULTY_STATE = "difficulty_state"
 SET_CATEGORY_STATE = "category_state"
 
-DEFAULT_SETTINGS = {"question_count": 3,
-                    "difficulty": pytrivia.Diffculty.Easy,
-                    "category": pytrivia.Category.Computers
-                    }
-
 states = {}
 questions = {}
-settings = {}
 current_correct_answer = {}
 current_game_statistic = {}
 
@@ -74,20 +57,19 @@ def initialize_game(user_id):
     current_game_statistic[user_id]["time"] = datetime.datetime.now()
     current_game_statistic[user_id]["correct_answers_count"] = 0
     current_game_statistic[user_id]["incorrect_answers_count"] = 0
-    current_settings = get_current_settings(user_id)
 
     # Функция уходит в бесконечный цикл, если запросить вопросов больше, чем есть в данной категории при использовании токена
     # ошибка в самом api - по документации в этом случае должен быть код возврата 1, а он - 4
     # так как мы инициализируем игру каждый раз, то повторяющихся вопросов быть не должно, и токен можно не использовать
     # без токена работает ожидаемо
     try:
-        api_reply = trivia_api.request(current_settings["question_count"],
-                                       current_settings["category"],
-                                       current_settings["difficulty"],
+        api_reply = trivia_api.request(settings_manager.get_question_count(user_id),
+                                       settings_manager.get_category(user_id),
+                                       settings_manager.get_difficulty(user_id),
                                        pytrivia.Type.Multiple_Choice)
     except ValueError:
         raise QuestionsAPIError(
-            "Число вопросов должно быть в интервале [1,50], а оно равно {}".format(current_settings["question_count"]))
+            "Число вопросов должно быть в интервале [1,50], а оно равно {}".format(settings_manager.get_question_count(user_id)))
     except Exception as error:
         raise QuestionsAPIError(str(error))
 
@@ -112,12 +94,6 @@ def send_next_question(user_id):
                      reply_markup=gen_answers_markup(question_with_answers["correct_answer"],
                                                      question_with_answers["incorrect_answers"]))
     current_correct_answer[user_id] = question_with_answers["correct_answer"]
-
-
-def get_current_settings(user_id):
-    if user_id not in settings:
-        settings[user_id] = DEFAULT_SETTINGS.copy()
-    return settings[user_id]
 
 
 def gen_main_menu_markup():
@@ -183,12 +159,12 @@ def main_menu_handler(call):
         except QuestionsAPIError as error:
             bot.send_message(user_id, str(error), reply_markup=gen_main_menu_markup())
         else:
-            current_settings = get_current_settings(user_id)
             start_game_message = "Начинаем!\n" \
                                  "Количество вопросов: {0}\n" \
                                  "Сложность: {1}\n" \
-                                 "Категория: {2}".format(current_settings["question_count"],
-                                                         current_settings["difficulty"], current_settings["category"])
+                                 "Категория: {2}".format(settings_manager.get_question_count(user_id),
+                                                         settings_manager.get_difficulty(user_id),
+                                                         settings_manager.get_category(user_id))
 
             bot.send_message(user_id, start_game_message)
             send_next_question(user_id)
@@ -235,9 +211,8 @@ def game_handler(call):
 @bot.message_handler(func=lambda message: states.get(message.from_user.id, MAIN_STATE) == SET_QUESTION_COUNT_STATE)
 def set_question_count_handler(message):
     user_id = message.from_user.id
-    current_settings = get_current_settings(user_id)
     try:
-        current_settings["question_count"] = int(message.text)
+        settings_manager.save_question_count(user_id, int(message.text))
     except ValueError:
         bot.reply_to(message, "Пожалуйста, введите целое число от 1 до 50 включительно")
     else:
@@ -250,17 +225,7 @@ def set_question_count_handler(message):
 @bot.callback_query_handler(func=lambda call: states.get(call.from_user.id, MAIN_STATE) == SET_DIFFICULTY_STATE)
 def set_difficulty_handler(call):
     user_id = call.from_user.id
-    current_settings = get_current_settings(user_id)
-    data = call.data
-
-    if data == "easy":
-        current_settings["difficulty"] = pytrivia.Diffculty.Easy
-    elif data == "medium":
-        current_settings["difficulty"] = pytrivia.Diffculty.Medium
-    elif data == "hard":
-        current_settings["difficulty"] = pytrivia.Diffculty.Hard
-    else:
-        assert False, "Invalid call.data={}".format(data)
+    settings_manager.save_difficulty(user_id, call.data)
 
     bot.send_message(user_id, "Выберем категорию",
                      reply_markup=gen_category_markup())
@@ -277,10 +242,7 @@ def set_question_count_handler(message):
 @bot.callback_query_handler(func=lambda call: states.get(call.from_user.id, MAIN_STATE) == SET_CATEGORY_STATE)
 def set_category_handler(call):
     user_id = call.from_user.id
-    current_settings = get_current_settings(user_id)
-    data = call.data
-    category = pytrivia.Category(int(data))
-    current_settings["category"] = category
+    settings_manager.save_category(user_id, call.data)
     bot.send_message(user_id, "Настройки приняты", reply_markup=gen_main_menu_markup())
     states[user_id] = MAIN_STATE
     bot.answer_callback_query(call.id)
